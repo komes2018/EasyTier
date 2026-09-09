@@ -6,6 +6,7 @@ on:
   pull_request:
     branches: ["develop", "main"]
     types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -26,7 +27,7 @@ jobs:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     # Map a step output to a job output
     outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip == 'true' && !startsWith(github.ref_name, 'releases/') }}
+      should_skip: ${{ steps.skip_check.outputs.should_skip == 'true' && !startsWith(github.ref_name, 'releases/') && github.event_name != 'workflow_dispatch' }}
     steps:
       - id: skip_check
         uses: fkirc/skip-duplicate-actions@v5
