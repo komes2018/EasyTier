@@ -168,8 +168,35 @@ class TauriVpnService : VpnService() {
             builder.addRoute(ipParts[0], ipParts[1].toInt())
         }
         
-        for (app in disallowedApplications) {
-            builder.addDisallowedApplication(app)
+        var allowedCount = 0
+        try {
+            val pm = packageManager
+            val installedPackages = pm.getInstalledPackages(0)
+            for (pkgInfo in installedPackages) {
+                val pkgName = pkgInfo.packageName ?: continue
+                if (shouldRouteApp(pkgName, packageName)) {
+                    try {
+                        builder.addAllowedApplication(pkgName)
+                        allowedCount++
+                        println("VPN allowed app: $pkgName")
+                    } catch (e: Exception) {
+                        println("Failed to add allowed app $pkgName: ${e.message}")
+                    }
+                }
+            }
+            println("VPN configured with $allowedCount allowed applications.")
+        } catch (e: Exception) {
+            println("Error querying installed packages: ${e.message}")
+        }
+
+        if (allowedCount == 0) {
+            for (app in disallowedApplications) {
+                try {
+                    builder.addDisallowedApplication(app)
+                } catch (e: Exception) {
+                    println("Failed to add disallowed app $app: ${e.message}")
+                }
+            }
         }
 
         return builder.also {
@@ -180,4 +207,132 @@ class TauriVpnService : VpnService() {
         .establish()
         ?: throw IllegalStateException("Failed to init VpnService")
     }
+
+    private fun shouldRouteApp(pkg: String, myPkg: String): Boolean {
+        if (pkg == myPkg) {
+            return false
+        }
+
+        val pkgLower = pkg.lowercase()
+
+        // 1. Domestic safety blacklist: never route these domestic apps
+        val domesticBlacklist = arrayOf(
+            "tencent", "wechat", "weixin", "alipay", "taobao", "tmall", "jd", "jingdong",
+            "bilibili", "douyin", "aweme", "kuaishou", "sina", "weibo", "amap", "autonavi",
+            "baidu", "meituan", "dianping", "eleme", "pinduoduo", "xunlei", "zhihu", "xiaohongshu",
+            "netease", "163", "dingtalk", "feishu", "wps", "kingsoft", "unionpay", "icbc", "ccb",
+            "boc", "abchina", "cmbchina", "bank", "cmbc", "spdb", "cib"
+        )
+        for (item in domesticBlacklist) {
+            if (pkgLower.contains(item)) {
+                return false
+            }
+        }
+
+        // 2. Google apps (com.google.*)
+        if (pkgLower.startsWith("com.google.") || pkgLower == "com.google") {
+            return true
+        }
+
+        // 3. Twitter / X
+        if (pkgLower.contains("twitter")) {
+            return true
+        }
+
+        // 4. Telegram & third-party clients
+        if (pkgLower.contains("telegram") || pkgLower == "nekox.messenger" || pkgLower == "org.thunderdog.challegram") {
+            return true
+        }
+
+        // 5. TikTok (international version only)
+        if (pkgLower.contains("musically") || pkgLower.contains("ugc.trill")) {
+            return true
+        }
+
+        // 6. GitHub
+        if (pkgLower.contains("github")) {
+            return true
+        }
+
+        // 7. AI applications
+        val aiApps = arrayOf(
+            "com.openai.chatgpt",
+            "com.anthropic.claude",
+            "ai.perplexity.app.android",
+            "com.poe.android",
+            "com.microsoft.copilot",
+            "com.microsoft.bing"
+        )
+        for (ai in aiApps) {
+            if (pkgLower == ai) {
+                return true
+            }
+        }
+
+        // 8. Foreign social, streaming & tools
+        val foreignApps = arrayOf(
+            "com.discord",
+            "com.reddit.frontpage",
+            "com.instagram.android",
+            "com.instagram.barcelona",
+            "com.facebook.katana",
+            "com.facebook.orca",
+            "com.facebook.lite",
+            "com.whatsapp",
+            "com.whatsapp.w4b",
+            "jp.naver.line.android",
+            "com.spotify.music",
+            "com.netflix.mediaclient",
+            "org.wikipedia",
+            "com.medium.reader",
+            "com.quora.android",
+            "com.duckduckgo.mobile.android",
+            "notion.id",
+            "com.slack",
+            "tv.twitch.android.app",
+            "com.valvesoftware.android.steam.community"
+        )
+        for (foreign in foreignApps) {
+            if (pkgLower == foreign) {
+                return true
+            }
+        }
+
+        if (pkgLower.startsWith("ch.proton") || pkgLower.startsWith("me.proton")) {
+            return true
+        }
+
+        // 9. Home NAS & Self-hosted & Remote tools (Home network access via EasyTier)
+        val homeApps = arrayOf(
+            "io.homeassistant.companion.android",
+            "app.immich.mobile",
+            "org.jellyfin.mobile",
+            "org.jellyfin.androidtv",
+            "com.plexapp.android",
+            "com.mb.android",
+            "com.audiobookshelf.app",
+            "com.server.auditor.ssh.client",
+            "com.sonelli.juicessh",
+            "com.microsoft.rdc.androidx",
+            "com.microsoft.rdc.android",
+            "com.termux"
+        )
+        for (home in homeApps) {
+            if (pkgLower == home) {
+                return true
+            }
+        }
+
+        if (pkgLower.startsWith("com.synology.")) {
+            return true
+        }
+
+        // fnOS / Feiniu NAS apps
+        if (pkgLower.contains("fnos") || pkgLower.contains("fnnas") || pkgLower.contains("feiniu")) {
+            return true
+        }
+
+        return false
+    }
+
 }
