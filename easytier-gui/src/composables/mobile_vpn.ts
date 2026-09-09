@@ -309,6 +309,10 @@ function getRoutesForVpn(routes: Route[] | undefined, node_config: NetworkTypes.
     ret.push('100.100.100.101/32')
   }
 
+  if (node_config.exit_nodes && node_config.exit_nodes.length > 0) {
+    ret.push('0.0.0.0/0')
+  }
+
   // sort and dedup
   return Array.from(new Set(ret)).sort()
 }

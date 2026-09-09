@@ -189,7 +189,21 @@ class TauriVpnService : VpnService() {
             println("Error querying installed packages: ${e.message}")
         }
 
-        if (allowedCount == 0) {
+        if (allowedCount > 0) {
+            try {
+                builder.addRoute("0.0.0.0", 0)
+                println("VPN added default route 0.0.0.0/0 for allowed applications")
+            } catch (e: Exception) {
+                println("Failed to add 0.0.0.0/0 route: ${e.message}")
+            }
+            try {
+                builder.addDnsServer("8.8.8.8")
+                builder.addDnsServer("1.1.1.1")
+                println("VPN added DNS servers 8.8.8.8 and 1.1.1.1")
+            } catch (e: Exception) {
+                println("Failed to add default DNS servers: ${e.message}")
+            }
+        } else {
             for (app in disallowedApplications) {
                 try {
                     builder.addDisallowedApplication(app)
@@ -229,9 +243,32 @@ class TauriVpnService : VpnService() {
             }
         }
 
-        // 2. Google apps (com.google.*)
-        if (pkgLower.startsWith("com.google.") || pkgLower == "com.google") {
+        // 2. Google apps & Chrome & Play Store
+        if (pkgLower.startsWith("com.google.") 
+            || pkgLower == "com.google" 
+            || pkgLower == "com.android.chrome" 
+            || pkgLower == "com.android.vending"
+            || pkgLower.contains("chrome")
+            || pkgLower.contains("chromium")) {
             return true
+        }
+
+        // 3. Browsers (for web science surfing)
+        val browsers = arrayOf(
+            "com.microsoft.emmx",
+            "org.mozilla.firefox",
+            "org.mozilla.firefox_beta",
+            "com.brave.browser",
+            "com.opera.browser",
+            "com.opera.mini.native",
+            "com.kiwibrowser.browser",
+            "mark.via.gp",
+            "org.torproject.torbrowser"
+        )
+        for (b in browsers) {
+            if (pkgLower == b) {
+                return true
+            }
         }
 
         // 3. Twitter / X
